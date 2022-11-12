@@ -27,4 +27,4 @@ streamlit run app.py
 
 ## Application URL
 
-Production: Coming soon
+Production: https://kg-wikinator.herokuapp.com/
