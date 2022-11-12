@@ -1,3 +1,4 @@
+import pandas as pd
 from SPARQLWrapper import SPARQLWrapper, JSON
 
 
@@ -23,12 +24,25 @@ def dbpedia_query(query):
     return all_results
 
 
-def first_query_person(is_woman, is_alive):
-    select = ""
-    where = ""
-    groupby = ""
-    orderby = ""
-    query = select + where + groupby + orderby
+def get_person_ontology(patterns: list = []):
+    select = "SELECT ?object (COUNT(?x) AS ?occurrences) "
+    where_start = "WHERE {?x a ?object ; a dbo:Person "
+    where_middle = "; a " + "; a ".join(patterns) if len(patterns) > 0 else ""
+    where_end = ". } "
+    where = where_start + where_middle + where_end
+    group_by = "GROUP BY ?object "
+    order_by = "ORDER BY DESC (?occurrences)"
+    limit = "LIMIT 200"
+    query = select + where + group_by + order_by + limit
+    print(query)
+    df_results = pd.DataFrame(dbpedia_query(query))
+    df = df_results[
+        (df_results['object'].str.count('dbpedia.org/ontology') > 0)
+        & (df_results['object'] != "http://dbpedia.org/ontology/Person")
+        & (df_results['object'] != "http://dbpedia.org/ontology/Species")
+        & (df_results['object'] != "http://dbpedia.org/ontology/Eukaryote")
+        & (df_results['object'] != "http://dbpedia.org/ontology/Animal")
+    ]
 
-    return dbpedia_query(query)
+    return df
 
