@@ -24,25 +24,48 @@ def dbpedia_query(query):
     return all_results
 
 
-def get_person_ontology(patterns: list = []):
+def get_ontology(patterns: list = [], base_kind='dbo:Person', exclude_list=[],  limit=200):
     select = "SELECT ?object (COUNT(?x) AS ?occurrences) "
-    where_start = "WHERE {?x a ?object ; a dbo:Person "
-    where_middle = "; a " + "; a ".join(patterns) if len(patterns) > 0 else ""
+    where_start = "WHERE {?x a ?object "
+    patterns.append(base_kind)
+    where_middle = "; a " + "; a ".join(patterns)
     where_end = ". } "
     where = where_start + where_middle + where_end
     group_by = "GROUP BY ?object "
     order_by = "ORDER BY DESC (?occurrences)"
-    limit = "LIMIT 200"
+    limit = f"LIMIT {limit}"
     query = select + where + group_by + order_by + limit
     print(query)
     df_results = pd.DataFrame(dbpedia_query(query))
+    df_results['object'] = df_results['object'].str.replace(
+        pat="http://dbpedia.org/ontology/",
+        repl="dbo:",
+    )
+    exclude_list.extend(patterns)
     df = df_results[
-        (df_results['object'].str.count('dbpedia.org/ontology') > 0)
-        & (df_results['object'] != "http://dbpedia.org/ontology/Person")
-        & (df_results['object'] != "http://dbpedia.org/ontology/Species")
-        & (df_results['object'] != "http://dbpedia.org/ontology/Eukaryote")
-        & (df_results['object'] != "http://dbpedia.org/ontology/Animal")
+        (df_results['object'].str.count('dbo') > 0)
+        & (~df_results['object'].isin(exclude_list))
     ]
 
     return df
+
+
+def get_person_ontology(patterns: list = [], limit=200):
+    exclude_list = [
+        "dbo:Person",
+        "dbo:Species",
+        "dbo:Eukaryote",
+        "dbo:Animal",
+    ]
+
+    return get_ontology(patterns, 'dbo:Person', exclude_list, limit)
+
+
+def get_character_ontology(patterns: list = [], limit=200):
+    exclude_list = [
+        "dbo:FictionalCharacter",
+        "dbo:Agent",
+    ]
+
+    return get_ontology(patterns, 'dbo:FictionalCharacter', exclude_list, limit)
 
