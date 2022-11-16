@@ -24,25 +24,91 @@ def dbpedia_query(query):
     return all_results
 
 
-def get_person_ontology(patterns: list = []):
+def get_ontology(patterns: list = [], base_kind='dbo:Person', exclude_list=[],  limit=200):
     select = "SELECT ?object (COUNT(?x) AS ?occurrences) "
-    where_start = "WHERE {?x a ?object ; a dbo:Person "
-    where_middle = "; a " + "; a ".join(patterns) if len(patterns) > 0 else ""
+    where_start = "WHERE {?x a ?object "
+    patterns.append(base_kind)
+    where_middle = "; a " + "; a ".join(patterns)
     where_end = ". } "
     where = where_start + where_middle + where_end
     group_by = "GROUP BY ?object "
     order_by = "ORDER BY DESC (?occurrences)"
-    limit = "LIMIT 200"
+    limit = f"LIMIT {limit}"
     query = select + where + group_by + order_by + limit
     print(query)
     df_results = pd.DataFrame(dbpedia_query(query))
+    df_results['object'] = df_results['object'].str.replace(
+        pat="http://dbpedia.org/ontology/",
+        repl="dbo:",
+    )
+    exclude_list.extend(patterns)
     df = df_results[
-        (df_results['object'].str.count('dbpedia.org/ontology') > 0)
-        & (df_results['object'] != "http://dbpedia.org/ontology/Person")
-        & (df_results['object'] != "http://dbpedia.org/ontology/Species")
-        & (df_results['object'] != "http://dbpedia.org/ontology/Eukaryote")
-        & (df_results['object'] != "http://dbpedia.org/ontology/Animal")
+        (df_results['object'].str.count('dbo') > 0)
+        & (~df_results['object'].isin(exclude_list))
     ]
 
     return df
 
+
+def get_person_ontology(patterns: list = [], limit=200):
+    exclude_list = [
+        "dbo:Person",
+        "dbo:Species",
+        "dbo:Eukaryote",
+        "dbo:Animal",
+    ]
+
+    return get_ontology(patterns, 'dbo:Person', exclude_list, limit)
+
+
+def get_character_ontology(patterns: list = [], limit=200):
+    exclude_list = [
+        "dbo:FictionalCharacter",
+        "dbo:Agent",
+    ]
+
+    return get_ontology(patterns, 'dbo:FictionalCharacter', exclude_list, limit)
+
+
+def ask_ontology_from_df(df, base_kind='dbo:Person', row=0):
+    question, ontology = '', ''
+    if len(df) > row:
+        base_kind = base_kind.split('dbo:')[1]
+        question_start = f'Is this {base_kind} a '
+        ontology = str(df.iloc[row, 0])
+        question = question_start + ontology.split('dbo:')[1] + '?'
+        print(question)
+
+    return question, ontology
+
+
+def next_person_ontology_question(assertions=[], df_last_question=None, row_last_question=None):
+    if len(assertions) > 0:
+        _, last_answer = assertions[-1]
+
+        if last_answer:  # Next query
+            patterns = [question for question, answer in assertions if answer]
+            df = get_person_ontology(patterns)
+            row = 0
+
+        else:  # Next row
+            df = df_last_question
+            row = row_last_question + 1
+
+    else:  # First question
+        df = get_person_ontology()
+        row = 0
+
+    question, ontology = ask_ontology_from_df(df, base_kind='dbo:Person', row=row)
+
+    if question:
+        assertions.append(ontology)
+
+    return question, assertions, df, row
+
+
+def save_answer(answer, assertions=[]):
+    if isinstance(assertions[-1], str):
+        assertions[-1] = assertions[-1], answer
+
+    return assertions
