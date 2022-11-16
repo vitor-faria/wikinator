@@ -69,3 +69,46 @@ def get_character_ontology(patterns: list = [], limit=200):
 
     return get_ontology(patterns, 'dbo:FictionalCharacter', exclude_list, limit)
 
+
+def ask_ontology_from_df(df, base_kind='dbo:Person', row=0):
+    question, ontology = '', ''
+    if len(df) > row:
+        base_kind = base_kind.split('dbo:')[1]
+        question_start = f'Is this {base_kind} a '
+        ontology = str(df.iloc[row, 0])
+        question = question_start + ontology.split('dbo:')[1] + '?'
+        print(question)
+
+    return question, ontology
+
+
+def next_person_ontology_question(assertions=[], df_last_question=None, row_last_question=None):
+    if len(assertions) > 0:
+        _, last_answer = assertions[-1]
+
+        if last_answer:  # Next query
+            patterns = [question for question, answer in assertions if answer]
+            df = get_person_ontology(patterns)
+            row = 0
+
+        else:  # Next row
+            df = df_last_question
+            row = row_last_question + 1
+
+    else:  # First question
+        df = get_person_ontology()
+        row = 0
+
+    question, ontology = ask_ontology_from_df(df, base_kind='dbo:Person', row=row)
+
+    if question:
+        assertions.append(ontology)
+
+    return question, assertions, df, row
+
+
+def save_answer(answer, assertions=[]):
+    if isinstance(assertions[-1], str):
+        assertions[-1] = assertions[-1], answer
+
+    return assertions

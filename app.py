@@ -1,5 +1,6 @@
-import pandas as pd
+from functions.dbpedia import next_person_ontology_question, save_answer
 import streamlit as st
+from streamlit.errors import DuplicateWidgetID
 
 
 def app():
@@ -12,7 +13,13 @@ def app():
         options=('Select', 'Fictional character', 'Real-world person'),
     )
 
-    default_answer_options = ("-", "Yes", "No", "I don't know")
+    answer_mapping = {
+        "-": None,
+        "Yes": True,
+        "No": False,
+        "I don't know": None,
+    }
+    default_answer_options = answer_mapping.keys()
 
     if first_question == 'Fictional character':
         st.write('So, you are thinking of a Fictional character...')
@@ -35,14 +42,26 @@ def app():
 
     elif first_question == 'Real-world person':
         st.write("So, you are thinking of a Real-world person...")
-        is_woman = st.radio(
-            label="Is this person a woman?",
-            options=default_answer_options,
-        )
-        is_alive = st.radio(
-            label="Is this person alive?",
-            options=default_answer_options,
-        )
+
+        question, assertions, df, row = ' ', [], None, None
+        next_question = True
+        while next_question:
+            next_question = False
+            question, assertions, df, row = next_person_ontology_question(assertions, df, row)
+            if len(question) > 0:
+                try:
+                    answer = st.radio(
+                        label=question,
+                        options=default_answer_options,
+                    )
+                    answer_bool = answer_mapping.get(answer)
+                    assertions = save_answer(answer_bool, assertions)
+                    if answer != '-':
+                        next_question = True
+                except DuplicateWidgetID:
+                    break
+
+        st.sidebar.write(str(assertions))
 
 
 if __name__ == "__main__":
