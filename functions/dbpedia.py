@@ -137,3 +137,35 @@ def save_answer(answer, assertions=[]):
         assertions[-1] = assertions[-1], answer
 
     return assertions
+
+
+def make_guess(assertions=[], base_kind='dbo:Person'):
+    select = "SELECT ?candidate (COUNT(?subject) AS ?ingoing_links) "
+    where_start = "WHERE {?candidate a " + base_kind
+    assertions = [assertion for assertion in assertions if isinstance(assertion, tuple)]
+    true_assertions = [assertion for assertion, assertion_is_true in assertions if assertion_is_true]
+    false_assertions = [assertion for assertion, assertion_is_true in assertions if not assertion_is_true]
+    where_middle = "; a " + "; a ".join(true_assertions)
+    filter_not_exists = ". "
+    if false_assertions:
+        filter_not_exists = ". FILTER NOT EXISTS { ?candidate a " + "; a ".join(false_assertions) + "} "
+    where_end = "?subject dbo:wikiPageWikiLink ?candidate . } "
+    where = where_start + where_middle + filter_not_exists + where_end
+    group_by = "GROUP BY ?candidate "
+    order_by = "ORDER BY DESC (?ingoing_links) "
+    limit = f"LIMIT 10"
+    query = select + where + group_by + order_by + limit
+    print(query)
+    df_results = pd.DataFrame(dbpedia_query(query))
+    df_results['candidate'] = df_results['candidate'].str.replace(
+        pat="http://dbpedia.org/resource/",
+        repl="",
+    ).str.replace(
+        pat="_",
+        repl=" ",
+    )
+
+    base_kind = base_kind.split('dbo:')[1]
+    question = f'Is this {base_kind} ' + df_results['candidate'][0] + "?"
+
+    return question, df_results
