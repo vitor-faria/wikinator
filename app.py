@@ -1,4 +1,4 @@
-from functions.dbpedia import next_person_ontology_question, save_answer
+from functions.dbpedia import next_person_ontology_question, next_character_ontology_question, save_answer
 import streamlit as st
 from streamlit.errors import DuplicateWidgetID
 
@@ -20,30 +20,31 @@ def app():
         "I don't know": None,
     }
     default_answer_options = answer_mapping.keys()
+    question, assertions, df, row = ' ', [], None, None
 
     if first_question == 'Fictional character':
         st.write('So, you are thinking of a Fictional character...')
-        is_human = st.radio(
-            label="Is this fictional character an human being?",
-            options=default_answer_options,
-        )
 
-        if is_human == 'Yes':
-            is_woman = st.radio(
-                label=f"Is this fictional character a woman?",
-                options=default_answer_options,
-            )
-
-        elif is_human == 'No':
-            is_humanoid = st.radio(
-                label=f"Does this fictional character look like a human?",
-                options=default_answer_options,
-            )
+        next_question = True
+        while next_question:
+            next_question = False
+            question, assertions, df, row = next_character_ontology_question(assertions, df, row)
+            if len(question) > 0:
+                try:
+                    answer = st.radio(
+                        label=question,
+                        options=default_answer_options,
+                    )
+                    answer_bool = answer_mapping.get(answer)
+                    assertions = save_answer(answer_bool, assertions)
+                    if answer != '-':
+                        next_question = True
+                except DuplicateWidgetID:
+                    break
 
     elif first_question == 'Real-world person':
         st.write("So, you are thinking of a Real-world person...")
 
-        question, assertions, df, row = ' ', [], None, None
         next_question = True
         while next_question:
             next_question = False
@@ -61,6 +62,7 @@ def app():
                 except DuplicateWidgetID:
                     break
 
+    if len(assertions) > 0:
         st.sidebar.write(str(assertions))
 
 

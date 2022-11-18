@@ -107,6 +107,31 @@ def next_person_ontology_question(assertions=[], df_last_question=None, row_last
     return question, assertions, df, row
 
 
+def next_character_ontology_question(assertions=[], df_last_question=None, row_last_question=None):
+    if len(assertions) > 0:
+        _, last_answer = assertions[-1]
+
+        if last_answer:  # Next query
+            patterns = [question for question, answer in assertions if answer]
+            df = get_character_ontology(patterns)
+            row = 0
+
+        else:  # Next row
+            df = df_last_question
+            row = row_last_question + 1
+
+    else:  # First question
+        df = get_character_ontology()
+        row = 0
+
+    question, ontology = ask_ontology_from_df(df, base_kind='dbo:FictionalCharacter', row=row)
+
+    if question:
+        assertions.append(ontology)
+
+    return question, assertions, df, row
+
+
 def save_answer(answer, assertions=[]):
     if isinstance(assertions[-1], str):
         assertions[-1] = assertions[-1], answer
