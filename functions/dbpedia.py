@@ -32,7 +32,7 @@ def get_ontology(patterns: list = [], base_kind='dbo:Person', exclude_list=[],  
     where_end = ". } "
     where = where_start + where_middle + where_end
     group_by = "GROUP BY ?object "
-    order_by = "ORDER BY DESC (?occurrences)"
+    order_by = "ORDER BY DESC (?occurrences) "
     limit = f"LIMIT {limit}"
     query = select + where + group_by + order_by + limit
     print(query)

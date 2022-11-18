@@ -1,4 +1,9 @@
-from functions.dbpedia import next_person_ontology_question, next_character_ontology_question, save_answer
+from functions.dbpedia import (
+    next_person_ontology_question,
+    next_character_ontology_question,
+    save_answer,
+    make_guess
+)
 import streamlit as st
 from streamlit.errors import DuplicateWidgetID
 
@@ -64,6 +69,25 @@ def app():
 
     if len(assertions) > 0:
         st.sidebar.write(str(assertions))
+        st.text("")
+        if st.button("Guess now!"):
+            base_kind = {
+                "Fictional character": "dbo:FictionalCharacter",
+                "Real-world person": "dbo:Person",
+            }
+            question, guesses = make_guess(assertions, base_kind=base_kind.get(first_question))
+            guess = st.radio(question, ("-", "Yes", "No"))
+            if guess == "Yes":
+                st.success("Yaaaaay! :tada:")
+                if st.button("Let's play again!"):
+                    st.experimental_rerun()
+            elif guess == "No":
+                st.text("That was the best we could do, these were our top guesses:")
+                st.write(guesses)
+                if st.button("Another round?"):
+                    st.experimental_rerun()
+
+
 
 
 if __name__ == "__main__":
