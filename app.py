@@ -1,7 +1,7 @@
 from functions.dbpedia import (
     next_person_ontology_question,
-    next_character_ontology_question,, 
-    get_predicate_object
+    next_character_ontology_question,
+    get_predicate_object,
     save_answer,
     make_guess
 )
@@ -34,7 +34,8 @@ def app():
         next_question = True
         while next_question:
             next_question = False
-            question, assertions, df, row = next_character_ontology_question(assertions, df, row)
+            question, assertions, df, row = next_character_ontology_question(
+                assertions, df, row)
             if len(question) > 0:
                 try:
                     answer = st.radio(
@@ -69,7 +70,6 @@ def app():
                 except DuplicateWidgetID:
                     break
 
-
         algorithm_next_question = True
         where = ""
         filter = ""
@@ -101,7 +101,6 @@ def app():
                 except DuplicateWidgetID:
                     break
 
-
     if len(assertions) > 0:
 
         st.sidebar.write(str(assertions))
@@ -111,7 +110,8 @@ def app():
                 "Fictional character": "dbo:FictionalCharacter",
                 "Real-world person": "dbo:Person",
             }
-            question, guesses = make_guess(assertions, base_kind=base_kind.get(first_question))
+            question, guesses = make_guess(
+                assertions, base_kind=base_kind.get(first_question))
             guess = st.radio(question, ("-", "Yes", "No"))
             if guess == "Yes":
                 st.success("Yaaaaay! :tada:")
@@ -122,8 +122,6 @@ def app():
                 st.write(guesses)
                 if st.button("Another round?"):
                     st.experimental_rerun()
-
-
 
 
 if __name__ == "__main__":
