@@ -1,4 +1,10 @@
-from functions.dbpedia import next_person_ontology_question, save_answer, get_predicate_object
+from functions.dbpedia import (
+    next_person_ontology_question,
+    next_character_ontology_question,, 
+    get_predicate_object
+    save_answer,
+    make_guess
+)
 import streamlit as st
 from streamlit.errors import DuplicateWidgetID
 
@@ -20,30 +26,31 @@ def app():
         "I don't know": None,
     }
     default_answer_options = answer_mapping.keys()
+    question, assertions, df, row = ' ', [], None, None
 
     if first_question == 'Fictional character':
         st.write('So, you are thinking of a Fictional character...')
-        is_human = st.radio(
-            label="Is this fictional character an human being?",
-            options=default_answer_options,
-        )
 
-        if is_human == 'Yes':
-            is_woman = st.radio(
-                label=f"Is this fictional character a woman?",
-                options=default_answer_options,
-            )
-
-        elif is_human == 'No':
-            is_humanoid = st.radio(
-                label=f"Does this fictional character look like a human?",
-                options=default_answer_options,
-            )
+        next_question = True
+        while next_question:
+            next_question = False
+            question, assertions, df, row = next_character_ontology_question(assertions, df, row)
+            if len(question) > 0:
+                try:
+                    answer = st.radio(
+                        label=question,
+                        options=default_answer_options,
+                    )
+                    answer_bool = answer_mapping.get(answer)
+                    assertions = save_answer(answer_bool, assertions)
+                    if answer != '-':
+                        next_question = True
+                except DuplicateWidgetID:
+                    break
 
     elif first_question == 'Real-world person':
         st.write("So, you are thinking of a Real-world person...")
 
-        question, assertions, df, row = ' ', [], None, None
         next_question = True
         while next_question:
             next_question = False
@@ -61,6 +68,7 @@ def app():
                         next_question = True
                 except DuplicateWidgetID:
                     break
+
 
         algorithm_next_question = True
         where = ""
@@ -93,7 +101,29 @@ def app():
                 except DuplicateWidgetID:
                     break
 
+
+    if len(assertions) > 0:
+
         st.sidebar.write(str(assertions))
+        st.text("")
+        if st.button("Guess now!"):
+            base_kind = {
+                "Fictional character": "dbo:FictionalCharacter",
+                "Real-world person": "dbo:Person",
+            }
+            question, guesses = make_guess(assertions, base_kind=base_kind.get(first_question))
+            guess = st.radio(question, ("-", "Yes", "No"))
+            if guess == "Yes":
+                st.success("Yaaaaay! :tada:")
+                if st.button("Let's play again!"):
+                    st.experimental_rerun()
+            elif guess == "No":
+                st.text("That was the best we could do, these were our top guesses:")
+                st.write(guesses)
+                if st.button("Another round?"):
+                    st.experimental_rerun()
+
+
 
 
 if __name__ == "__main__":
