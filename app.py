@@ -1,6 +1,7 @@
 from functions.dbpedia import (
     next_person_ontology_question,
-    next_character_ontology_question,
+    next_character_ontology_question,, 
+    get_predicate_object
     save_answer,
     make_guess
 )
@@ -10,7 +11,7 @@ from streamlit.errors import DuplicateWidgetID
 
 def app():
     st.sidebar.title("Wikinator")
-    
+
     # Streamlit cheat sheet: https://share.streamlit.io/daniellewisdl/streamlit-cheat-sheet/app.py
     st.sidebar.subheader("Let me guess who you are thinking of!")
     first_question = st.sidebar.selectbox(
@@ -53,7 +54,8 @@ def app():
         next_question = True
         while next_question:
             next_question = False
-            question, assertions, df, row = next_person_ontology_question(assertions, df, row)
+            question, assertions, df, row = next_person_ontology_question(
+                assertions, df, row)
             if len(question) > 0:
                 try:
                     answer = st.radio(
@@ -67,7 +69,41 @@ def app():
                 except DuplicateWidgetID:
                     break
 
+
+        algorithm_next_question = True
+        where = ""
+        filter = ""
+        index = 0
+        while algorithm_next_question:
+            algorithm_next_question = False
+            question, predicate, object = get_predicate_object(
+                where_middle=where, filter=filter, index=index)
+            if len(question) > 0:
+                try:
+                    answer = st.radio(
+                        label=question,
+                        options=default_answer_options,
+                    )
+                    answer_bool = answer_mapping.get(answer)
+
+                    if answer_bool:
+                        where += '?x <' + predicate + '> <' + object + '>.'
+                        index = 0
+                    elif not answer_bool:
+                        filter = " FILTER NOT EXISTS(?x <" + \
+                            predicate + "> <" + object + ">)."
+                        index = 0
+                    elif not isinstance(answer_bool, bool):
+                        index += 1
+
+                    if answer != '-':
+                        algorithm_next_question = True
+                except DuplicateWidgetID:
+                    break
+
+
     if len(assertions) > 0:
+
         st.sidebar.write(str(assertions))
         st.text("")
         if st.button("Guess now!"):
