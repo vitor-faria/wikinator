@@ -28,6 +28,7 @@ def app():
     default_answer_options = answer_mapping.keys()
     question, assertions, df, row = ' ', [], None, None
 
+    start_algorithm = False
     if first_question == 'Fictional character':
         st.write('So, you are thinking of a Fictional character...')
 
@@ -47,6 +48,7 @@ def app():
                     if answer != '-':
                         next_question = True
                 except DuplicateWidgetID:
+                    start_algorithm = True
                     break
 
     elif first_question == 'Real-world person':
@@ -68,16 +70,20 @@ def app():
                     if answer != '-':
                         next_question = True
                 except DuplicateWidgetID:
+                    start_algorithm = True
                     break
 
-        algorithm_next_question = True
-        where = ""
-        filter = ""
-        index = 0
+    algorithm_next_question = True
+    index = 0
+    if start_algorithm:
         while algorithm_next_question:
             algorithm_next_question = False
-            question, predicate, object = get_predicate_object(
-                where_middle=where, filter=filter, index=index)
+            base_kind = "dbo:Person"
+            if first_question == "Fictional Character":
+                base_kind = "dbo:FictionalCharacter"
+
+            question, assertions = get_predicate_object(base_kind,
+                                                        assertions, index=index)
             if len(question) > 0:
                 try:
                     answer = st.radio(
@@ -85,13 +91,11 @@ def app():
                         options=default_answer_options,
                     )
                     answer_bool = answer_mapping.get(answer)
+                    assertions = save_answer(answer_bool, assertions)
 
                     if answer_bool:
-                        where += '?x <' + predicate + '> <' + object + '>.'
                         index = 0
                     elif not answer_bool:
-                        filter = " FILTER NOT EXISTS(?x <" + \
-                            predicate + "> <" + object + ">)."
                         index = 0
                     elif not isinstance(answer_bool, bool):
                         index += 1
