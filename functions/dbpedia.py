@@ -25,18 +25,16 @@ def dbpedia_query(query):
 
 
 def get_ontology(patterns: list = [], base_kind='dbo:Person', exclude_list=[],  limit=200):
-    select = "SELECT ?object (COUNT(?x) AS ?occurrences) "
-    where_start = "WHERE {?x a ?object "
+    select = "SELECT ?object (COUNT(?candidate) AS ?occurrences) "
     patterns.append(base_kind)
-    where_middle = "; a " + "; a ".join(patterns)
-    where_end = ". } "
-    where = where_start + where_middle + where_end
+    where = build_where_clause(patterns, base_kind, " ?candidate a ?object. ")
     group_by = "GROUP BY ?object "
     order_by = "ORDER BY DESC (?occurrences) "
     limit = f"LIMIT {limit}"
     query = select + where + group_by + order_by + limit
     print(query)
     df_results = pd.DataFrame(dbpedia_query(query))
+    print(df_results)
     df_results['object'] = df_results['object'].str.replace(
         pat="http://dbpedia.org/ontology/",
         repl="dbo:",
@@ -50,27 +48,43 @@ def get_ontology(patterns: list = [], base_kind='dbo:Person', exclude_list=[],  
     return df
 
 
-def get_predicate_object(patterns: list = [], ontology_patterns='', exclude_list=[], where_middle="", filter="", index=""):
-    select = "SELECT ?predicate ?object (COUNT(?x) as ?occurrences) "
-    where_start = "WHERE {?x ?predicate ?object. "
-    #where_middle = "; a " + "; a ".join(ontology_patterns) + ". "
-    where_end = "} "
-    where = where_start + ontology_patterns + where_middle + filter + where_end
-    group_by = "GROUP BY ?predicate ?object "
-    order_by = "ORDER BY DESC (?occurrences)"
-    query = select + where + group_by + order_by
+def build_where_clause(assertions=[], base_kind='dbo:Person', extra_clause=''):
+    assertions = [tuple_element for tuple_element in assertions if isinstance(
+        tuple_element, tuple)]
+    true_assertions = [assertion for assertion,
+                       is_true in assertions if is_true]
+    false_assertions = [assertion for assertion,
+                        is_true in assertions if not is_true]
+    where_start = "WHERE { ?candidate a " + base_kind
+    where_middle = " . "
+    if true_assertions:
+        where_middle = " ; " + " ; ".join(true_assertions) + " . "
+    filter_not_exists = " "
+    if false_assertions:
+        filter_not_exists_start = "FILTER NOT EXISTS ( ?candidate "
+        filter_not_exists_end = " ; ".join(false_assertions) + " ) "
+        filter_not_exists = filter_not_exists_start + filter_not_exists_end
+
+    return where_start + where_middle + filter_not_exists + extra_clause + " }"
+
+
+def get_predicate_object(base_kind="dbo:Person", assertions=[], index=""):
+    select = "SELECT ?predicate ?object (COUNT(?candidate) as ?occurrences) "
+    where = build_where_clause(
+        assertions, base_kind, " ?candidate ?predicate ?object. ")
+    group_by = " GROUP BY ?predicate ?object "
+    order_by = " ORDER BY DESC (?occurrences) "
+    limit = " LIMIT 50 "
+    query = select + where + group_by + order_by + limit
     print(query)
     df_results = pd.DataFrame(dbpedia_query(query))
-    # exclude_list.extend(patterns)
-    # df = df_results[
-    #    (df_results['object'].str.count('dbo') > 0)
-    #    & (~df_results['object'].isin(exclude_list))
-    # ]
 
     return order_by_relevance(df_results, index)
 
 
-def order_by_relevance(resultSet, index=0):
+def order_by_relevance(resultSet, index=0, assertions=[]):
+
+    print(resultSet)
 
     optimalOccurences = int(resultSet.occurrences[index])/2
 
@@ -80,14 +94,17 @@ def order_by_relevance(resultSet, index=0):
     resultSet.sort_values(by=['occurrences'], inplace=True)
     resultSet.reset_index(drop=True, inplace=True)
 
-    return ask_next_question(resultSet, index)
+    return ask_next_question(resultSet, index, assertions)
 
 
-def ask_next_question(resultSet, index):
+def ask_next_question(resultSet, index=0, assertions=[]):
     question = ("Does your character have the following relation: " + resultSet.predicate[index].rsplit(
         "/", 1)[-1] + " ---> " + resultSet.object[index].rsplit("/", 1)[-1] + "?")
 
-    return (question, resultSet.predicate[index], resultSet.object[index])
+    assertions = assertions.append(("<{}> <{}>".format(
+        resultSet.predicate[index], resultSet.object[index]), None))
+
+    return (question, assertions)
 
 
 def get_person_ontology(patterns: list = [], limit=200):
@@ -143,7 +160,7 @@ def next_person_ontology_question(assertions=[], df_last_question=None, row_last
         df, base_kind='dbo:Person', row=row)
 
     if question:
-        assertions.append(ontology)
+        assertions.append("a " + ontology)
 
     return question, assertions, df, row
 
@@ -165,7 +182,8 @@ def next_character_ontology_question(assertions=[], df_last_question=None, row_l
         df = get_character_ontology()
         row = 0
 
-    question, ontology = ask_ontology_from_df(df, base_kind='dbo:FictionalCharacter', row=row)
+    question, ontology = ask_ontology_from_df(
+        df, base_kind='dbo:FictionalCharacter', row=row)
 
     if question:
         assertions.append(ontology)
@@ -183,13 +201,17 @@ def save_answer(answer, assertions=[]):
 def make_guess(assertions=[], base_kind='dbo:Person'):
     select = "SELECT ?candidate (COUNT(?subject) AS ?ingoing_links) "
     where_start = "WHERE {?candidate a " + base_kind
-    assertions = [assertion for assertion in assertions if isinstance(assertion, tuple)]
-    true_assertions = [assertion for assertion, assertion_is_true in assertions if assertion_is_true]
-    false_assertions = [assertion for assertion, assertion_is_true in assertions if not assertion_is_true]
+    assertions = [
+        assertion for assertion in assertions if isinstance(assertion, tuple)]
+    true_assertions = [assertion for assertion,
+                       assertion_is_true in assertions if assertion_is_true]
+    false_assertions = [assertion for assertion,
+                        assertion_is_true in assertions if not assertion_is_true]
     where_middle = "; a " + "; a ".join(true_assertions)
     filter_not_exists = ". "
     if false_assertions:
-        filter_not_exists = ". FILTER NOT EXISTS { ?candidate a " + "; a ".join(false_assertions) + "} "
+        filter_not_exists = ". FILTER NOT EXISTS { ?candidate a " + "; a ".join(
+            false_assertions) + "} "
     where_end = "?subject dbo:wikiPageWikiLink ?candidate . } "
     where = where_start + where_middle + filter_not_exists + where_end
     group_by = "GROUP BY ?candidate "
