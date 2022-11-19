@@ -50,6 +50,46 @@ def get_ontology(patterns: list = [], base_kind='dbo:Person', exclude_list=[],  
     return df
 
 
+def get_predicate_object(patterns: list = [], ontology_patterns='', exclude_list=[], where_middle="", filter="", index=""):
+    select = "SELECT ?predicate ?object (COUNT(?x) as ?occurrences) "
+    where_start = "WHERE {?x ?predicate ?object. "
+    #where_middle = "; a " + "; a ".join(ontology_patterns) + ". "
+    where_end = "} "
+    where = where_start + ontology_patterns + where_middle + filter + where_end
+    group_by = "GROUP BY ?predicate ?object "
+    order_by = "ORDER BY DESC (?occurrences)"
+    query = select + where + group_by + order_by
+    print(query)
+    df_results = pd.DataFrame(dbpedia_query(query))
+    # exclude_list.extend(patterns)
+    # df = df_results[
+    #    (df_results['object'].str.count('dbo') > 0)
+    #    & (~df_results['object'].isin(exclude_list))
+    # ]
+
+    return order_by_relevance(df_results, index)
+
+
+def order_by_relevance(resultSet, index=0):
+
+    optimalOccurences = int(resultSet.occurrences[index])/2
+
+    for row in resultSet.iterrows():
+        row[1][2] = abs(int(row[1][2]) - optimalOccurences)
+
+    resultSet.sort_values(by=['occurrences'], inplace=True)
+    resultSet.reset_index(drop=True, inplace=True)
+
+    return ask_next_question(resultSet, index)
+
+
+def ask_next_question(resultSet, index):
+    question = ("Does your character have the following relation: " + resultSet.predicate[index].rsplit(
+        "/", 1)[-1] + " ---> " + resultSet.object[index].rsplit("/", 1)[-1] + "?")
+
+    return (question, resultSet.predicate[index], resultSet.object[index])
+
+
 def get_person_ontology(patterns: list = [], limit=200):
     exclude_list = [
         "dbo:Person",
@@ -99,7 +139,8 @@ def next_person_ontology_question(assertions=[], df_last_question=None, row_last
         df = get_person_ontology()
         row = 0
 
-    question, ontology = ask_ontology_from_df(df, base_kind='dbo:Person', row=row)
+    question, ontology = ask_ontology_from_df(
+        df, base_kind='dbo:Person', row=row)
 
     if question:
         assertions.append(ontology)
