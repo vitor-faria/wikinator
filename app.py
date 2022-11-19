@@ -1,7 +1,7 @@
 from functions.dbpedia import (
     next_person_ontology_question,
     next_character_ontology_question,
-    get_predicate_object,
+    next_predicate_question,
     save_answer,
     make_guess
 )
@@ -18,6 +18,11 @@ def app():
         label="Is it a fictional character or a real-world person?",
         options=('Select', 'Fictional character', 'Real-world person'),
     )
+    base_kind_map = {
+        "Fictional character": "dbo:FictionalCharacter",
+        "Real-world person": "dbo:Person",
+    }
+    base_kind = base_kind_map.get(first_question)
 
     answer_mapping = {
         "-": None,
@@ -28,7 +33,7 @@ def app():
     default_answer_options = answer_mapping.keys()
     question, assertions, df, row = ' ', [], None, None
 
-    start_algorithm = False
+    start_predicate_questions = False
     if first_question == 'Fictional character':
         st.write('So, you are thinking of a Fictional character...')
 
@@ -37,7 +42,7 @@ def app():
             next_question = False
             question, assertions, df, row = next_character_ontology_question(
                 assertions, df, row)
-            if len(question) > 0:
+            if len(question) > 1:
                 try:
                     answer = st.radio(
                         label=question,
@@ -48,7 +53,7 @@ def app():
                     if answer != '-':
                         next_question = True
                 except DuplicateWidgetID:
-                    start_algorithm = True
+                    start_predicate_questions = True
                     break
 
     elif first_question == 'Real-world person':
@@ -59,7 +64,7 @@ def app():
             next_question = False
             question, assertions, df, row = next_person_ontology_question(
                 assertions, df, row)
-            if len(question) > 0:
+            if len(question) > 1:
                 try:
                     answer = st.radio(
                         label=question,
@@ -70,21 +75,19 @@ def app():
                     if answer != '-':
                         next_question = True
                 except DuplicateWidgetID:
-                    start_algorithm = True
+                    start_predicate_questions = True
                     break
 
-    algorithm_next_question = True
-    index = 0
-    if start_algorithm:
-        while algorithm_next_question:
-            algorithm_next_question = False
-            base_kind = "dbo:Person"
-            if first_question == "Fictional Character":
-                base_kind = "dbo:FictionalCharacter"
-
-            question, assertions = get_predicate_object(base_kind,
-                                                        assertions, index=index)
-            if len(question) > 0:
+    if start_predicate_questions:
+        more_predicate_questions = True
+        assertions = [assertion for assertion in assertions if isinstance(assertion, tuple)]
+        question, df, row = ' ', None, None
+        while more_predicate_questions:
+            more_predicate_questions = False
+            question, assertions, df, row = next_predicate_question(
+                assertions, base_kind, df, row
+            )
+            if len(question) > 1:
                 try:
                     answer = st.radio(
                         label=question,
@@ -93,15 +96,8 @@ def app():
                     answer_bool = answer_mapping.get(answer)
                     assertions = save_answer(answer_bool, assertions)
 
-                    if answer_bool:
-                        index = 0
-                    elif not answer_bool:
-                        index = 0
-                    elif not isinstance(answer_bool, bool):
-                        index += 1
-
                     if answer != '-':
-                        algorithm_next_question = True
+                        more_predicate_questions = True
                 except DuplicateWidgetID:
                     break
 
