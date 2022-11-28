@@ -44,7 +44,11 @@ def get_ontology(assertions=[], base_kind='dbo:Person', exclude_set={"owl:Thing"
     for assertion in assertions:
         if isinstance(assertion, tuple):
             if assertion[0].startswith("a "):
-                exclude_set.update(assertion[0].split("a ")[0])
+                exclude_set.add(assertion[0].split("a ")[1])
+        elif isinstance(assertion, str):
+            if assertion.startswith("a "):
+                exclude_set.add(assertion.split("a ")[1])
+    print(exclude_set)
     df = df_results[
         (df_results['object'].str.count('dbo') > 0)
         & (~df_results['object'].isin(exclude_set))
@@ -81,10 +85,14 @@ def get_predicate_object(base_kind="dbo:Person", assertions=[], index=0):
     )
     group_by = " GROUP BY ?predicate ?object "
     order_by = " ORDER BY DESC (?occurrences) "
-    limit = " LIMIT 50 "
+    limit = " LIMIT 100 "
     query = select + where + group_by + order_by + limit
     print(query)
     df_results = pd.DataFrame(dbpedia_query(query))
+    exclude_predicates = {
+        'http://dbpedia.org/property/wikiPageUsesTemplate'
+    }
+    df_results = df_results[~df_results['predicate'].isin(exclude_predicates)]
 
     return order_by_relevance(df_results, index)
 
@@ -107,8 +115,10 @@ def ask_predicate_from_df(df_results, base_kind='dbo:Person', row=0):
         _predicate = str(df_results.iloc[row, 0])
         _object = str(df_results.iloc[row, 1])
         predicate_object = f"<{_predicate}> <{_object}>"
+        _predicate, _object = _predicate.split('/')[-1], _object.split('/')[-1]
         question = f"{question_start} {_predicate} {_object}?"
         print(question)
+        print(df_results.head())
 
     return question, predicate_object
 
@@ -161,6 +171,7 @@ def ask_ontology_from_df(df, base_kind='dbo:Person', row=0):
         ontology = str(df.iloc[row, 0])
         question = question_start + ontology.split('dbo:')[1] + '?'
         print(question)
+        print(df.head(10))
 
     return question, ontology
 
@@ -170,8 +181,7 @@ def next_person_ontology_question(assertions=[], df_last_question=None, row_last
         _, last_answer = assertions[-1]
 
         if last_answer:  # Next query
-            patterns = [question for question, answer in assertions if answer]
-            df = get_person_ontology(patterns)
+            df = get_person_ontology(assertions)
             row = 0
 
         else:  # Next row
@@ -197,8 +207,7 @@ def next_character_ontology_question(assertions=[], df_last_question=None, row_l
         _, last_answer = assertions[-1]
 
         if last_answer:  # Next query
-            patterns = [question for question, answer in assertions if answer]
-            df = get_character_ontology(patterns)
+            df = get_character_ontology(assertions)
             row = 0
 
         else:  # Next row
