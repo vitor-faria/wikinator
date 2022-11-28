@@ -44,7 +44,13 @@ def get_ontology(assertions=[], base_kind='dbo:Person', exclude_set={"owl:Thing"
     for assertion in assertions:
         if isinstance(assertion, tuple):
             if assertion[0].startswith("a "):
-                exclude_set.update(assertion[0].split("a ")[0])
+                exclude_set.add(assertion[0].split("a ")[1])
+            # exclude_set.add(assertion[0])
+        elif isinstance(assertion, str):
+            if assertion.startswith("a "):
+                exclude_set.add(assertion.split("a ")[1])
+            # exclude_set.add(assertion)
+    print(exclude_set)
     df = df_results[
         (df_results['object'].str.count('dbo') > 0)
         & (~df_results['object'].isin(exclude_set))
@@ -109,6 +115,7 @@ def ask_predicate_from_df(df_results, base_kind='dbo:Person', row=0):
         predicate_object = f"<{_predicate}> <{_object}>"
         question = f"{question_start} {_predicate} {_object}?"
         print(question)
+        print(df_results.head())
 
     return question, predicate_object
 
@@ -161,6 +168,7 @@ def ask_ontology_from_df(df, base_kind='dbo:Person', row=0):
         ontology = str(df.iloc[row, 0])
         question = question_start + ontology.split('dbo:')[1] + '?'
         print(question)
+        print(df.head(10))
 
     return question, ontology
 
@@ -170,8 +178,7 @@ def next_person_ontology_question(assertions=[], df_last_question=None, row_last
         _, last_answer = assertions[-1]
 
         if last_answer:  # Next query
-            patterns = [question for question, answer in assertions if answer]
-            df = get_person_ontology(patterns)
+            df = get_person_ontology(assertions)
             row = 0
 
         else:  # Next row
@@ -197,8 +204,7 @@ def next_character_ontology_question(assertions=[], df_last_question=None, row_l
         _, last_answer = assertions[-1]
 
         if last_answer:  # Next query
-            patterns = [question for question, answer in assertions if answer]
-            df = get_character_ontology(patterns)
+            df = get_character_ontology(assertions)
             row = 0
 
         else:  # Next row

@@ -65,18 +65,18 @@ def app():
             question, assertions, df, row = next_person_ontology_question(
                 assertions, df, row)
             if len(question) > 1:
-                try:
-                    answer = st.radio(
-                        label=question,
-                        options=default_answer_options,
-                    )
-                    answer_bool = answer_mapping.get(answer)
-                    assertions = save_answer(answer_bool, assertions)
-                    if answer != '-':
-                        next_question = True
-                except DuplicateWidgetID:
-                    start_predicate_questions = True
-                    break
+
+                answer = st.radio(
+                    label=question,
+                    options=default_answer_options,
+                )
+                answer_bool = answer_mapping.get(answer)
+                assertions = save_answer(answer_bool, assertions)
+                if answer != '-':
+                    next_question = True
+            if question == '':
+                start_predicate_questions = True
+                break
 
     if start_predicate_questions:
         more_predicate_questions = True
@@ -105,7 +105,7 @@ def app():
 
         st.sidebar.write(str(assertions))
         st.text("")
-        if st.button("Guess now!"):
+        if st.checkbox("Guess now!", False):
             base_kind = {
                 "Fictional character": "dbo:FictionalCharacter",
                 "Real-world person": "dbo:Person",
@@ -115,13 +115,10 @@ def app():
             guess = st.radio(question, ("-", "Yes", "No"))
             if guess == "Yes":
                 st.success("Yaaaaay! :tada:")
-                if st.button("Let's play again!"):
-                    st.experimental_rerun()
+
             elif guess == "No":
                 st.text("That was the best we could do, these were our top guesses:")
                 st.write(guesses)
-                if st.button("Another round?"):
-                    st.experimental_rerun()
 
 
 if __name__ == "__main__":
