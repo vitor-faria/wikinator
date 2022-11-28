@@ -85,10 +85,14 @@ def get_predicate_object(base_kind="dbo:Person", assertions=[], index=0):
     )
     group_by = " GROUP BY ?predicate ?object "
     order_by = " ORDER BY DESC (?occurrences) "
-    limit = " LIMIT 50 "
+    limit = " LIMIT 100 "
     query = select + where + group_by + order_by + limit
     print(query)
     df_results = pd.DataFrame(dbpedia_query(query))
+    exclude_predicates = {
+        'http://dbpedia.org/property/wikiPageUsesTemplate'
+    }
+    df_results = df_results[~df_results['predicate'].isin(exclude_predicates)]
 
     return order_by_relevance(df_results, index)
 
@@ -111,6 +115,7 @@ def ask_predicate_from_df(df_results, base_kind='dbo:Person', row=0):
         _predicate = str(df_results.iloc[row, 0])
         _object = str(df_results.iloc[row, 1])
         predicate_object = f"<{_predicate}> <{_object}>"
+        _predicate, _object = _predicate.split('/')[-1], _object.split('/')[-1]
         question = f"{question_start} {_predicate} {_object}?"
         print(question)
         print(df_results.head())
