@@ -45,11 +45,9 @@ def get_ontology(assertions=[], base_kind='dbo:Person', exclude_set={"owl:Thing"
         if isinstance(assertion, tuple):
             if assertion[0].startswith("a "):
                 exclude_set.add(assertion[0].split("a ")[1])
-            # exclude_set.add(assertion[0])
         elif isinstance(assertion, str):
             if assertion.startswith("a "):
                 exclude_set.add(assertion.split("a ")[1])
-            # exclude_set.add(assertion)
     print(exclude_set)
     df = df_results[
         (df_results['object'].str.count('dbo') > 0)
