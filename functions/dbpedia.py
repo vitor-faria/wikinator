@@ -61,17 +61,23 @@ def build_where_clause(assertions=[], base_kind='dbo:Person', extra_clause=''):
     assertions = [
         tuple_element for tuple_element in assertions if isinstance(tuple_element, tuple)
     ]
-    true_assertions = [assertion for assertion, is_true in assertions if is_true]
-    false_assertions = [assertion for assertion, is_true in assertions if not is_true and isinstance(is_true, bool)]
+    true_assertions = [assertion for assertion,
+                       is_true in assertions if is_true]
+    false_assertions = [assertion for assertion,
+                        is_true in assertions if not is_true and isinstance(is_true, bool)]
     where_start = "WHERE { ?candidate a " + base_kind
     where_middle = " . "
     if true_assertions:
-        where_middle = " ; " + " ; ".join(true_assertions) + " . "
+        where_middle = " ; " + " .?candidate ".join(true_assertions) + " . "
+        print("???", where_middle)
     filter_not_exists = " "
     if false_assertions:
-        filter_not_exists_start = "FILTER NOT EXISTS { ?candidate "
-        filter_not_exists_end = " ; ".join(false_assertions) + " } "
-        filter_not_exists = filter_not_exists_start + filter_not_exists_end
+        for false_assertion in false_assertions:
+            filter_not_exists += "FILTER NOT EXISTS { ?candidate " + \
+                false_assertion + "}"
+        #filter_not_exists_start = "FILTER NOT EXISTS { ?candidate "
+        #filter_not_exists_end = " ; ".join(false_assertions) + " } "
+        #filter_not_exists = filter_not_exists_start + filter_not_exists_end
 
     return where_start + where_middle + filter_not_exists + extra_clause + " }"
 
@@ -117,7 +123,19 @@ def ask_predicate_from_df(df_results, base_kind='dbo:Person', row=0):
         _object = str(df_results.iloc[row, 1])
         predicate_object = f"<{_predicate}> <{_object}>"
         if not _object.startswith('http://'):
-            predicate_object = f'<{_predicate}> "{_object}"@en'
+            try:
+                if _object.isnumeric():
+                    predicate_object = f'<{_predicate}> {_object}'
+                else:
+                    if _object.__contains__("(") | _object.__contains__(")"):
+                        _cleansed_object = _object.replace(
+                            ")", "\)").replace(")", "\)").replace("(", "\(").replace("(", "\(")
+                        predicate_object = f'<{_predicate}> ?x. FILTER (regex(str(?x), "{_cleansed_object}"))'
+                    else:
+                        predicate_object = f'<{_predicate}> "{_object}"@en'
+            except (Exception):
+                print("Error in predicate selection")
+
         _predicate, _object = _predicate.split('/')[-1], _object.split('/')[-1]
         question = f"{question_start} {_predicate} {_object}?"
         print(question)
@@ -221,7 +239,8 @@ def next_character_ontology_question(assertions=[], df_last_question=None, row_l
         df = get_character_ontology()
         row = 0
 
-    question, ontology = ask_ontology_from_df(df, base_kind='dbo:FictionalCharacter', row=row)
+    question, ontology = ask_ontology_from_df(
+        df, base_kind='dbo:FictionalCharacter', row=row)
 
     if question:
         assertions.append("a " + ontology)
