@@ -62,7 +62,7 @@ def build_where_clause(assertions=[], base_kind='dbo:Person', extra_clause=''):
         tuple_element for tuple_element in assertions if isinstance(tuple_element, tuple)
     ]
     true_assertions = [assertion for assertion, is_true in assertions if is_true]
-    false_assertions = [assertion for assertion, is_true in assertions if not is_true]
+    false_assertions = [assertion for assertion, is_true in assertions if not is_true and isinstance(is_true, bool)]
     where_start = "WHERE { ?candidate a " + base_kind
     where_middle = " . "
     if true_assertions:
@@ -85,12 +85,13 @@ def get_predicate_object(base_kind="dbo:Person", assertions=[], index=0):
     )
     group_by = " GROUP BY ?predicate ?object "
     order_by = " ORDER BY DESC (?occurrences) "
-    limit = " LIMIT 100 "
-    query = select + where + group_by + order_by + limit
+    query = select + where + group_by + order_by
     print(query)
     df_results = pd.DataFrame(dbpedia_query(query))
     exclude_predicates = {
-        'http://dbpedia.org/property/wikiPageUsesTemplate'
+        'http://dbpedia.org/property/wikiPageUsesTemplate',
+        'http://dbpedia.org/ontology/wikiPageWikiLink',
+        'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
     }
     df_results = df_results[~df_results['predicate'].isin(exclude_predicates)]
 
@@ -98,7 +99,7 @@ def get_predicate_object(base_kind="dbo:Person", assertions=[], index=0):
 
 
 def order_by_relevance(df_results, index=0):
-    optimal_occurrences = int(df_results.occurrences[index])/2
+    optimal_occurrences = int(df_results.iloc[index, 2])/2
     df_results["normalized_occurrences"] = df_results["occurrences"].apply(
         lambda x: abs(int(x) - optimal_occurrences)
     )
@@ -115,6 +116,8 @@ def ask_predicate_from_df(df_results, base_kind='dbo:Person', row=0):
         _predicate = str(df_results.iloc[row, 0])
         _object = str(df_results.iloc[row, 1])
         predicate_object = f"<{_predicate}> <{_object}>"
+        if not _object.startswith('http://'):
+            predicate_object = f'<{_predicate}> "{_object}"@en'
         _predicate, _object = _predicate.split('/')[-1], _object.split('/')[-1]
         question = f"{question_start} {_predicate} {_object}?"
         print(question)
