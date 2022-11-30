@@ -43,18 +43,17 @@ def app():
             question, assertions, df, row = next_character_ontology_question(
                 assertions, df, row)
             if len(question) > 1:
-                try:
-                    answer = st.radio(
-                        label=question,
-                        options=default_answer_options,
-                    )
-                    answer_bool = answer_mapping.get(answer)
-                    assertions = save_answer(answer_bool, assertions)
-                    if answer != '-':
-                        next_question = True
-                except DuplicateWidgetID:
-                    start_predicate_questions = True
-                    break
+                answer = st.radio(
+                    label=question,
+                    options=default_answer_options,
+                )
+                answer_bool = answer_mapping.get(answer)
+                assertions = save_answer(answer_bool, assertions)
+                if answer != '-':
+                    next_question = True
+            if question == '':
+                start_predicate_questions = True
+                break
 
     elif first_question == 'Real-world person':
         st.write("So, you are thinking of a Real-world person...")
@@ -80,7 +79,8 @@ def app():
 
     if start_predicate_questions:
         more_predicate_questions = True
-        assertions = [assertion for assertion in assertions if isinstance(assertion, tuple)]
+        assertions = [
+            assertion for assertion in assertions if isinstance(assertion, tuple)]
         question, df, row = ' ', None, None
         while more_predicate_questions:
             more_predicate_questions = False
