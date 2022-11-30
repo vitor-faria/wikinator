@@ -127,6 +127,7 @@ def ask_predicate_from_df(df_results, base_kind='dbo:Person', row=0):
                 if _object.isnumeric():
                     predicate_object = f'<{_predicate}> {_object}'
                 else:
+                    _object = _object.replace('"', "'")
                     if _object.__contains__("(") | _object.__contains__(")"):
                         _cleansed_object = _object.replace(
                             ")", "\)").replace(")", "\)").replace("(", "\(").replace("(", "\(")
@@ -137,7 +138,7 @@ def ask_predicate_from_df(df_results, base_kind='dbo:Person', row=0):
                 print("Error in predicate selection")
 
         _predicate, _object = _predicate.split('/')[-1], _object.split('/')[-1]
-        question = f"{question_start} {_predicate} {_object}?"
+        question = f"{question_start} '{_predicate}' : '{_object}'?"
         print(question)
         print(df_results.head())
 
